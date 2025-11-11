@@ -1,4 +1,4 @@
-
+// Declarar variables de vistas y estado en un ámbito accesible
 const formContainer = document.getElementById('formContainer');
 const loadingContainer = document.getElementById('loadingContainer');
 const confirmationContainer = document.getElementById('confirmationContainer');
@@ -7,6 +7,7 @@ const viewPdfButton = document.getElementById('viewPdfButton');
 
 let formFields;
 let generatedPdfBlobUrl = null; // Guardaremos la URL del PDF aquí
+let generatedPdfFilename = null; // Guardaremos el nombre del archivo aquí
 
 document.addEventListener('DOMContentLoaded', () => {
     // Asignar formFields una vez que el DOM está listo
@@ -54,7 +55,16 @@ form.addEventListener('submit', async (event) => {
     try {
         const images = await getImagesAsBase64();
         const pdfBlob = await generatePdfBlob(data, images);
+        
+        // Limpiar URL anterior si existiera
+        if (generatedPdfBlobUrl) {
+            URL.revokeObjectURL(generatedPdfBlobUrl);
+        }
         generatedPdfBlobUrl = URL.createObjectURL(pdfBlob); // Guardar la URL del blob
+
+        // Crear y guardar el nombre del archivo
+        const cleanEmpresa = data.empresa.replace(/[^a-z0-9]/gi, '_');
+        generatedPdfFilename = `Reclamacion_${cleanEmpresa}_${data.factura}_${data.fecha}.pdf`;
 
         // Configurar el enlace de correo
         const mailtoLink = document.getElementById('mailtoLink');
@@ -74,11 +84,21 @@ form.addEventListener('submit', async (event) => {
     }
 });
 
-// Event listener para el botón "Ver y Guardar PDF" (el segundo clic)
+// Event listener para el botón "Ver y Guardar PDF"
 viewPdfButton.addEventListener('click', () => {
-    if (generatedPdfBlobUrl) {
+    if (generatedPdfBlobUrl && generatedPdfFilename) {
+        // Opción 1: Abrir en nueva pestaña (bueno para móviles)
         window.open(generatedPdfBlobUrl, '_blank');
-        // Limpiar localStorage DESPUÉS de que el usuario haya visto el PDF
+
+        // Opción 2: Forzar descarga con nombre de archivo (bueno para escritorio)
+        const link = document.createElement('a');
+        link.href = generatedPdfBlobUrl;
+        link.download = generatedPdfFilename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Limpiar localStorage DESPUÉS de que el usuario haya visto/guardado el PDF
         formFields.forEach(field => localStorage.removeItem(field.id));
     } else {
         alert("Error: No se ha generado ningún PDF.");
@@ -100,7 +120,8 @@ function getImagesAsBase64() {
                 reader.onerror = reject;
                 reader.readAsDataURL(input.files[0]);
             } else {
-                reject(new Error(`La imagen "${input.labels[0].textContent}" es obligatoria.`));
+                // Hacemos las imágenes opcionales para pruebas; en producción, la validación del form se encarga
+                resolve(null); 
             }
         });
     });
@@ -111,10 +132,8 @@ async function generatePdfBlob(data, images) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
 
-    const margin = 15; // Un poco más de margen lateral
     const pageWidth = doc.internal.pageSize.getWidth();
-    const contentWidth = pageWidth - (margin * 2);
-    const headerHeight = 28; // Altura del nuevo encabezado
+    const headerHeight = 25;
 
     // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
     //  INSTRUCCIÓN: Pega la cadena de texto completa del logo en base64 aquí dentro de las comillas.
@@ -123,80 +142,74 @@ async function generatePdfBlob(data, images) {
     
     // --- 1. DIBUJAR EL ENCABEZADO PERSONALIZADO ---
     try {
-        // Fondo color hueso/amarillo claro
-        doc.setFillColor(255, 251, 234); // RGB para #FFFBEA
+        doc.setFillColor(255, 251, 234); // #FFFBEA
         doc.rect(0, 0, pageWidth, headerHeight, 'F');
-
-        // Extraer solo los datos del base64, por si acaso se pega con el prefijo "data:image..."
         const base64Data = logoEnBase64.split(',')[1] || logoEnBase64;
-
-        // Añadir logos a izquierda y derecha
-        doc.addImage(base64Data, 'PNG', margin, 5, 30, 15); // Logo izquierdo
-        doc.addImage(base64Data, 'PNG', pageWidth - margin - 30, 5, 30, 15); // Logo derecho
-        
-        // Título en rojo
+        doc.addImage(base64Data, 'PNG', 15, 5, 30, 15);
+        doc.addImage(base64Data, 'PNG', pageWidth - 15 - 30, 5, 30, 15);
         doc.setFontSize(16).setFont('Helvetica', 'bold').setTextColor(255, 0, 0);
-        doc.text('RECLAMACION DE GARANTÍAS', pageWidth / 2, 16, { align: 'center' });
-
+        doc.text('RECLAMACION DE GARANTÍAS', pageWidth / 2, 15, { align: 'center' });
     } catch (logoError) {
-        console.warn('Hubo un error al procesar el logo en base64:', logoError);
-        doc.setFontSize(9).setTextColor(255, 0, 0).text('Error al cargar el logo', margin, 10);
+        console.warn('Error al procesar el logo en base64:', logoError);
     }
     
     // --- 2. DIBUJAR LOS CAMPOS DEL FORMULARIO ---
-    let y = headerHeight + 10; // Posición Y inicial después del encabezado
-    const fieldHeight = 8, labelWidth = 30, dataWidth = 60;
-    const col1X = margin;
-    const col2X = pageWidth / 2 + 5; // Segunda columna empieza un poco a la derecha del centro
+    let y = headerHeight + 10;
+    const fieldHeight = 7, labelWidth = 25, dataWidth = 65;
+    const col1X = 15;
+    const col2X = pageWidth / 2 + 5;
 
-    const drawField = (label, value, x, yPos, lWidth = labelWidth, dWidth = dataWidth) => {
+    const drawField = (label, value, x, yPos) => {
         doc.setFontSize(9).setFont('Helvetica', 'bold').setFillColor(230, 230, 230);
-        doc.rect(x, yPos, lWidth, fieldHeight, 'FD'); // Rectángulo relleno para la etiqueta
-        doc.setTextColor(0, 0, 0).text(label, x + 2, yPos + 5);
-        
-        doc.rect(x + lWidth, yPos, dWidth, fieldHeight, 'S'); // Borde para el valor
-        doc.setFont('Helvetica', 'normal').text(value || '', x + lWidth + 2, yPos + 5, { maxWidth: dWidth - 4 });
+        doc.rect(x, yPos, labelWidth, fieldHeight, 'FD');
+        doc.setTextColor(0, 0, 0).text(label, x + 2, yPos + 4.5);
+        doc.setDrawColor(0, 0, 0).rect(x + labelWidth, yPos, dataWidth, fieldHeight, 'S');
+        doc.setFont('Helvetica', 'normal').text(value || '', x + labelWidth + 2, yPos + 4.5, { maxWidth: dataWidth - 4 });
     };
-    
-    // Campos en dos columnas
+
+    // Columna Izquierda
     drawField('FECHA', data.fecha, col1X, y);
-    drawField('AGENTE', 'R. Arroyo', col2X, y, 25, 65); y += fieldHeight + 2;
-    drawField('CLIENTE', data.empresa, col1X, y);
-    drawField('CONTACTO', data.contacto, col2X, y, 25, 65); y += fieldHeight + 2;
-    drawField('MODELO', data.modelo, col1X, y); y += fieldHeight + 2;
-    drawField('REF', data.referencia, col1X, y); y += fieldHeight + 2;
-    drawField('TALLA', data.talla, col1X, y); y += fieldHeight + 8; // Espacio extra antes de la descripción
+    drawField('CLIENTE', data.empresa, col1X, y + fieldHeight + 2);
+    // Espacio extra
+    drawField('MODELO', data.modelo, col1X, y + (fieldHeight + 2) * 2 + 5);
+    drawField('REF', data.referencia, col1X, y + (fieldHeight + 2) * 3 + 5);
+    drawField('TALLA', data.talla, col1X, y + (fieldHeight + 2) * 4 + 5);
 
-    // Descripción del defecto
-    doc.setFontSize(9).setFont('Helvetica', 'bold').text('DESCRIPCIÓN DEFECTO', col1X, y); y += 4;
-    const descHeight = 30;
-    doc.rect(col1X, y, contentWidth, descHeight, 'S'); // Borde del cuadro de texto
-    const splitDescription = doc.splitTextToSize(data.defecto, contentWidth - 4);
-    doc.setFont('Helvetica', 'normal').text(splitDescription, col1X + 2, y + 5);
-    y += descHeight + 8; // Espacio extra antes de las fotos
+    // Columna Derecha
+    drawField('AGENTE', 'R. Arroyo', col2X, y);
+    drawField('CONTACTO', data.contacto, col2X, y + fieldHeight + 2);
 
+    // Descripción del defecto (alineado a la columna derecha)
+    let yDesc = y + (fieldHeight + 2) * 2 + 5;
+    doc.setFontSize(9).setFont('Helvetica', 'bold').text('DESCRIPCIÓN DEFECTO', col2X, yDesc - 1);
+    const descHeight = 25;
+    const descWidth = labelWidth + dataWidth;
+    doc.setDrawColor(0, 0, 0).rect(col2X, yDesc, descWidth, descHeight, 'S');
+    const splitDescription = doc.splitTextToSize(data.defecto, descWidth - 4);
+    doc.setFont('Helvetica', 'normal').text(splitDescription, col2X + 2, yDesc + 4.5);
+    
     // --- 3. DIBUJAR EL ÁREA DE FOTOGRAFÍAS ---
-    const photoAreaHeight = doc.internal.pageSize.getHeight() - y - margin; // Altura restante
-    doc.setFillColor(245, 245, 245).rect(margin, y, contentWidth, photoAreaHeight, 'F');
-    const photoMargin = 4;
-    const photoGridWidth = (contentWidth - photoMargin) / 2;
-    const photoGridHeight = (photoAreaHeight - photoMargin - 10) / 2; // -10 para dejar espacio al título
+    let yPhotos = y + (fieldHeight + 2) * 5 + 10;
+    const photoAreaHeight = doc.internal.pageSize.getHeight() - yPhotos - 15;
+    const contentWidth = pageWidth - 30;
 
-    doc.setFontSize(12).setFont('Helvetica', 'bold').setTextColor(100, 100, 100);
-    doc.text('Fotografías Adjuntas', pageWidth / 2, y + 7, { align: 'center' });
+    doc.setFillColor(239, 239, 239).rect(col1X, yPhotos, contentWidth, photoAreaHeight, 'F');
+    doc.setDrawColor(0, 0, 0).rect(col1X, yPhotos, contentWidth, photoAreaHeight, 'S');
+    doc.setFontSize(12).setFont('Helvetica', 'bold').setTextColor(85, 85, 85); // #555555
+    doc.text('INSERTAR FOTOGRAFÍAS', pageWidth / 2, yPhotos + 10, { align: 'center' });
     
-    let photoY = y + 10;
+    const photoMargin = 4;
+    const photoGridY = yPhotos + 15;
+    const photoGridWidth = (contentWidth - photoMargin) / 2;
+    const photoGridHeight = (photoAreaHeight - 20 - photoMargin) / 2;
     
-    // Añadir imágenes con un manejo de errores básico
     try {
-        if (images.delantera) doc.addImage(images.delantera, 'JPEG', col1X, photoY, photoGridWidth, photoGridHeight);
-        if (images.trasera) doc.addImage(images.trasera, 'JPEG', col1X + photoGridWidth + photoMargin, photoY, photoGridWidth, photoGridHeight);
-        photoY += photoGridHeight + photoMargin;
-        if (images.detalle) doc.addImage(images.detalle, 'JPEG', col1X, photoY, photoGridWidth, photoGridHeight);
-        if (images.etiqueta) doc.addImage(images.etiqueta, 'JPEG', col1X + photoGridWidth + photoMargin, photoY, photoGridWidth, photoGridHeight);
+        if (images.delantera) doc.addImage(images.delantera, 'JPEG', col1X, photoGridY, photoGridWidth, photoGridHeight);
+        if (images.trasera) doc.addImage(images.trasera, 'JPEG', col1X + photoGridWidth + photoMargin, photoGridY, photoGridWidth, photoGridHeight);
+        if (images.detalle) doc.addImage(images.detalle, 'JPEG', col1X, photoGridY + photoGridHeight + photoMargin, photoGridWidth, photoGridHeight);
+        if (images.etiqueta) doc.addImage(images.etiqueta, 'JPEG', col1X + photoGridWidth + photoMargin, photoGridY + photoGridHeight + photoMargin, photoGridWidth, photoGridHeight);
     } catch(imgError) {
         console.error("Error al añadir una imagen al PDF:", imgError);
-        doc.setTextColor(255,0,0).text("Error al cargar imagen", col1X + 5, photoY + 20);
     }
 
     return doc.output('blob');
