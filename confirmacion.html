@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reclamación Generada - Representaciones Arroyo</title>
+    <link rel="stylesheet" href="css/confirmacion.css">
+</head>
+<body>
+    <div class="confirm-container">
+        <img src="img/logo.jpg" alt="Logo Representaciones Arroyo" class="logo">
+        <h1>¡PDF Generado con Éxito!</h1>
+        <p>Tu reclamación está lista. Por favor, sigue estos dos sencillos pasos:</p>
+        
+        <div class="step">
+            <h2>Paso 1: Guarda tu Reclamación</h2>
+            <p>Haz clic aquí para ver el PDF. Una vez abierto, usa el menú "Compartir" o "Guardar" de tu teléfono para guardarlo en tus archivos.</p>
+            <a href="#" id="viewPdfButton" class="btn-accion btn-ver-pdf">Ver y Guardar PDF</a>
+            <p id="pdfError" style="display: none; color: #ffcc00;">No se encontró el PDF. Vuelve atrás y genera la reclamación de nuevo.</p>
+        </div>
+
+        <div class="step">
+            <h2>Paso 2: Envíanos el Correo</h2>
+            <p>Ahora, abre tu aplicación de correo. Estará lista para enviar, <strong class="glow">RECUERDA ADJUNTAR EL PDF</strong> que acabas de guardar.</p>
+            <a href="#" id="mailtoLink" class="btn-accion btn-correo">Abrir Aplicación de Correo</a>
+        </div>
+        <button id="resetButton" class="btn-nuevo-form">Crear otra reclamación</button>
+    </div>
+
+    <footer style="text-align: center; padding: 20px; color: #cbd5e1;">
+        <small>
+            Desarrollado por Pablo Vidal Vidal
+            <div class="contact-info">
+                 <span class="contact-item"><svg class="contact-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414zM0 4.697v7.104l5.803-3.558zM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586zm3.436-.586L16 11.801V4.697z"/></svg> pablo2vbngdaw@gmail.com</span>
+            </div>
+            &copy; 2025 Todos los derechos reservados.
+        </small>
+    </footer>
+
+    <!-- ¡IMPORTANTE! Cargar jspdf aquí -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="js/confirmacion.js"></script>
+</body>
+</html>

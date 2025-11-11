@@ -1,0 +1,57 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background: linear-gradient(rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.9)), url(https://www.publicdomainpictures.net/pictures/320000/velka/background-15814524273L3.jpg);
+    background-size: cover;
+    background-attachment: fixed;
+    color: #f1f5f9;
+    margin: 0;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column; 
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    text-align: center;
+}
+
+.confirm-container {
+    background-color: rgba(30, 41, 59, 0.9);
+    padding: 2rem 3rem;
+    border-radius: 8px;
+    border: 1px solid #475569;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    width: 100%;
+    max-width: 700px;
+}
+
+.logo { width: 100px; height: 100px; object-fit: cover; margin-bottom: 1.5rem; }
+h1 { color: #fff; text-transform: uppercase; letter-spacing: 1px; font-size: 1.8rem; margin-bottom: 1rem; }
+p { font-size: 1rem; line-height: 1.6; color: #cbd5e1; }
+
+.step { margin-top: 2rem; padding: 1.5rem; background-color: rgba(15, 23, 42, 0.8); border-radius: 5px; border-left: 5px solid #005A9C; text-align: left; }
+.step h2 { margin-top: 0; color: #f97316; font-size: 1.4em; }
+
+.btn-accion { display: inline-block; width: 90%; margin-top: 1rem; padding: 1rem 1.5rem; border: none; border-radius: 5px; cursor: pointer; font-size: 1.1em; font-weight: bold; text-transform: uppercase; text-decoration: none; text-align: center; transition: all 0.3s ease; }
+.btn-ver-pdf { background-color: #005A9C; color: #fff; }
+.btn-ver-pdf:hover { background-color: #004170; }
+.btn-correo { background-color: #f97316; color: #fff; }
+.btn-correo:hover { background-color: #ea580c; }
+
+@keyframes glow {
+    0%, 100% { text-shadow: 0 0 5px rgba(249, 115, 22, 0.5); }
+    50% { color: #fff; text-shadow: 0 0 15px #f97316, 0 0 20px #f97316; }
+}
+.glow { color: #f97316; animation: glow 2s ease-in-out infinite; }
+
+footer { width: 100%; max-width: 700px; margin-top: 2rem; }
+.contact-info { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 10px 20px; margin: 8px 0; }
+.contact-item { display: flex; align-items: center; gap: 8px; }
+.contact-icon { width: 1em; height: 1em; }
+@media (min-width: 601px) {
+    .container {
+        width: 90%; /* Ancho del formulario al 90% */
+        max-width: 800px; /* Mantenemos el ancho máximo para pantallas muy grandes */
+    }
+}
