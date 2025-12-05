@@ -163,24 +163,33 @@ async function generatePdfBlob(data, images) {
         doc.setFont('Helvetica', 'normal').text(value || '', x + labelWidth + 2, yPos + 4.5, { maxWidth: dataWidth - 4 });
     };
 
+    // 1. Columna Izquierda: Datos principales
     drawField('FECHA', data.fecha, col1X, y);
     drawField('CLIENTE', data.empresa, col1X, y + fieldHeight + 2);
-    drawField('MODELO', data.modelo, col1X, y + (fieldHeight + 2) * 2 + 5);
-    drawField('REF', data.referencia, col1X, y + (fieldHeight + 2) * 3 + 5);
-    drawField('TALLA', data.talla, col1X, y + (fieldHeight + 2) * 4 + 5);
+    // AQUI AÑADIMOS LA FACTURA
+    drawField('Nº FACTURA', data.factura, col1X, y + (fieldHeight + 2) * 2);
 
+    // 2. Columna Izquierda: Detalles del producto (Desplazados hacia abajo)
+    drawField('MODELO', data.modelo, col1X, y + (fieldHeight + 2) * 3 + 5);
+    drawField('REF', data.referencia, col1X, y + (fieldHeight + 2) * 4 + 5);
+    drawField('TALLA', data.talla, col1X, y + (fieldHeight + 2) * 5 + 5);
+
+    // 3. Columna Derecha: Datos de contacto
     drawField('AGENTE', 'R. Arroyo', col2X, y);
     drawField('CONTACTO', data.contacto, col2X, y + fieldHeight + 2);
 
-    let yDesc = y + (fieldHeight + 2) * 2 + 5;
+    // 4. Columna Derecha: Descripción (Alineada con el bloque de producto)
+    let yDesc = y + (fieldHeight + 2) * 3 + 5;
     doc.setFontSize(9).setFont('Helvetica', 'bold').text('DESCRIPCIÓN DEFECTO', col2X, yDesc - 1);
+    
     const descHeight = 25;
     const descWidth = labelWidth + dataWidth;
     doc.setDrawColor(0, 0, 0).rect(col2X, yDesc, descWidth, descHeight, 'S');
     const splitDescription = doc.splitTextToSize(data.defecto, descWidth - 4);
     doc.setFont('Helvetica', 'normal').text(splitDescription, col2X + 2, yDesc + 4.5);
     
-    let yPhotos = y + (fieldHeight + 2) * 5 + 10;
+    // 5. Calcular posición de las fotos (ajustado al nuevo tamaño)
+    let yPhotos = y + (fieldHeight + 2) * 6 + 10;
     const photoAreaHeight = doc.internal.pageSize.getHeight() - yPhotos - 15;
     const contentWidth = pageWidth - 30;
 
