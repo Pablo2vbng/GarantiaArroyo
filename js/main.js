@@ -1,34 +1,19 @@
+// Declarar variables de vistas y estado en un ámbito accesible
+const formContainer = document.getElementById('formContainer');
+const loadingContainer = document.getElementById('loadingContainer');
+const confirmationContainer = document.getElementById('confirmationContainer');
+const form = document.getElementById('reclamacionForm');
+const viewPdfButton = document.getElementById('viewPdfButton');
+
+let formFields;
+let generatedPdfBlobUrl = null; // Guardaremos la URL del PDF aquí
+let generatedPdfFileName = "Reclamacion.pdf"; // Variable para guardar el nombre personalizado
+
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("DOM cargado. Iniciando script...");
+    // Asignar formFields una vez que el DOM está listo
+    formFields = form.querySelectorAll('input[type="text"], input[type="date"], input[type="tel"], textarea');
 
-    // 1. Referencias a elementos del DOM (Buscamos todo aquí dentro para asegurar que existen)
-    const formContainer = document.getElementById('formContainer');
-    const loadingContainer = document.getElementById('loadingContainer');
-    const confirmationContainer = document.getElementById('confirmationContainer');
-    const form = document.getElementById('reclamacionForm');
-    const viewPdfButton = document.getElementById('viewPdfButton');
-    const resetButton = document.getElementById('resetButton');
-
-    // Variables de estado
-    let generatedPdfBlobUrl = null; 
-    let generatedPdfFileName = "Reclamacion.pdf"; 
-
-    // VERIFICACIÓN DE SEGURIDAD
-    if (!form) {
-        console.error("ERROR CRÍTICO: No se encontró el formulario con id='reclamacionForm'");
-        alert("Error: No se encuentra el formulario. Revisa que el HTML tenga id='reclamacionForm'");
-        return;
-    }
-
-    if (!window.jspdf) {
-        console.error("ERROR CRÍTICO: jsPDF no está cargado.");
-        alert("Error: La librería jsPDF no se cargó. Revisa tu conexión a internet.");
-        return;
-    }
-
-    // 2. Guardado automático de datos (LocalStorage)
-    const formFields = form.querySelectorAll('input[type="text"], input[type="date"], input[type="tel"], textarea');
-    
+    // Lógica para guardar y cargar datos del formulario en localStorage
     const saveData = () => formFields.forEach(field => localStorage.setItem(field.id, field.value));
     const loadData = () => {
         formFields.forEach(field => {
@@ -36,243 +21,264 @@ document.addEventListener('DOMContentLoaded', () => {
             if (savedValue) field.value = savedValue;
         });
     };
-    
     formFields.forEach(field => field.addEventListener('input', saveData));
     loadData();
 
-    // 3. Feedback visual para input file
+    // Lógica para mostrar feedback de subida de archivos
     const fileInputs = document.querySelectorAll('input[type="file"]');
     fileInputs.forEach(input => {
         input.addEventListener('change', (event) => {
-            const container = event.target.closest('.input-ejemplo');
-            if (container) {
-                const successMessage = container.querySelector('.upload-success-message');
-                if (successMessage) {
-                    successMessage.style.display = event.target.files.length > 0 ? 'inline' : 'none';
-                }
-            }
+            const successMessage = event.target.closest('.input-ejemplo').querySelector('.upload-success-message');
+            successMessage.style.display = event.target.files.length > 0 ? 'inline' : 'none';
         });
     });
 
-    // 4. Botón Reset
-    if (resetButton) {
-        resetButton.addEventListener('click', () => {
-            formFields.forEach(field => localStorage.removeItem(field.id));
-            window.location.reload();
-        });
-    }
-
-    // 5. Botón Ver PDF (Confirmación)
-    if (viewPdfButton) {
-        viewPdfButton.addEventListener('click', () => {
-            if (generatedPdfBlobUrl) {
-                const link = document.createElement('a');
-                link.href = generatedPdfBlobUrl;
-                link.download = generatedPdfFileName; 
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                // Limpiar datos
-                formFields.forEach(field => localStorage.removeItem(field.id));
-            } else {
-                alert("Error: No se ha generado ningún PDF.");
-            }
-        });
-    }
-
-    // ==========================================
-    // 6. LÓGICA PRINCIPAL: ENVÍO DEL FORMULARIO
-    // ==========================================
-    form.addEventListener('submit', async (event) => {
-        // PASO CLAVE: Evitar recarga
-        event.preventDefault(); 
-        console.log("Formulario enviado. Procesando...");
-
-        try {
-            // Cambiar vista a cargando
-            if (formContainer) formContainer.style.display = 'none';
-            if (loadingContainer) loadingContainer.style.display = 'block';
-
-            const formData = new FormData(form);
-            const data = Object.fromEntries(formData.entries());
-
-            // Generar nombre archivo
-            let fechaStr = "00-00-00";
-            if(data.fecha) {
-                const parts = data.fecha.split('-'); 
-                if(parts.length === 3) fechaStr = `${parts[2]}-${parts[1]}-${parts[0].slice(-2)}`;
-            }
-            const empresaLimpia = (data.empresa || '').replace(/[^a-zA-Z0-9]/g, '');
-            const facturaStr = (data.factura || '').replace(/[^a-zA-Z0-9]/g, '');
-            generatedPdfFileName = `Garantia-${empresaLimpia}-${facturaStr}-${fechaStr}.pdf`;
-
-            // Procesar imágenes y PDF
-            const images = await getImagesAsBase64();
-            const pdfBlob = await generatePdfBlob(data, images, generatedPdfFileName);
-            
-            generatedPdfBlobUrl = URL.createObjectURL(pdfBlob); 
-
-            // Configurar mailto
-            const mailtoLink = document.getElementById('mailtoLink');
-            if (mailtoLink) {
-                const subject = `Nueva Reclamación de: ${data.empresa} - Factura: ${data.factura || 'N/A'}`;
-                const body = `Hola,\n\nHas recibido una nueva reclamación de la empresa: ${data.empresa}.\nPersona de contacto: ${data.contacto}.\n\nTodos los detalles y las imágenes están en el archivo PDF adjunto (${generatedPdfFileName}).\n\nSaludos.`;
-                mailtoLink.href = `mailto:nacho@representacionesarroyo.es,paloma@representacionesarroyo.es?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-            }
-
-            // Mostrar confirmación
-            if (loadingContainer) loadingContainer.style.display = 'none';
-            if (confirmationContainer) confirmationContainer.style.display = 'block';
-
-        } catch (error) {
-            console.error("Error capturado:", error);
-            alert("Ocurrió un error: " + error.message);
-            // Restaurar vista
-            if (loadingContainer) loadingContainer.style.display = 'none';
-            if (formContainer) formContainer.style.display = 'block';
-        }
+    // Botón para crear una nueva reclamación
+    const resetButton = document.getElementById('resetButton');
+    resetButton.addEventListener('click', () => {
+        formFields.forEach(field => localStorage.removeItem(field.id));
+        window.location.reload();
     });
 });
 
-// --- FUNCIONES AUXILIARES (Fuera del evento para limpieza) ---
+// Event listener para el envío del formulario
+form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    
+    // Cambiar a la vista de "Cargando"
+    formContainer.style.display = 'none';
+    loadingContainer.style.display = 'block';
+
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    // --- LÓGICA DE NOMBRE DEL ARCHIVO ---
+    let fechaStr = "00-00-00";
+    if(data.fecha) {
+        const parts = data.fecha.split('-'); // [2025, 12, 09]
+        if(parts.length === 3) {
+            fechaStr = `${parts[2]}-${parts[1]}-${parts[0].slice(-2)}`;
+        }
+    }
+
+    const empresaLimpia = (data.empresa || '').replace(/[^a-zA-Z0-9]/g, '');
+    const facturaStr = (data.factura || '').replace(/[^a-zA-Z0-9]/g, '');
+
+    generatedPdfFileName = `Garantia-${empresaLimpia}-${facturaStr}-${fechaStr}.pdf`;
+    // -------------------------------------
+
+    try {
+        const images = await getImagesAsBase64();
+        // Pasamos el nombre del archivo a la función generadora para los metadatos
+        const pdfBlob = await generatePdfBlob(data, images, generatedPdfFileName);
+        generatedPdfBlobUrl = URL.createObjectURL(pdfBlob); // Guardar la URL del blob
+
+        // Configurar el enlace de correo
+        const mailtoLink = document.getElementById('mailtoLink');
+        const subject = `Nueva Reclamación de: ${data.empresa} - Factura: ${data.factura || 'N/A'}`;
+        const body = `Hola,\n\nHas recibido una nueva reclamación de la empresa: ${data.empresa}.\nPersona de contacto: ${data.contacto}.\n\nTodos los detalles y las imágenes están en el archivo PDF adjunto (${generatedPdfFileName}).\n\nSaludos.`;
+        mailtoLink.href = `mailto:nacho@representacionesarroyo.es,paloma@representacionesarroyo.es?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+        // Cambiar a la vista de "Confirmación"
+        loadingContainer.style.display = 'none';
+        confirmationContainer.style.display = 'block';
+
+    } catch (error) {
+        alert(error.message || 'Hubo un problema al generar el PDF.');
+        console.error(error);
+        // Volver a la vista del formulario si hay un error
+        loadingContainer.style.display = 'none';
+        formContainer.style.display = 'block';
+    }
+});
+
+// Event listener para el botón "Ver y Guardar PDF"
+viewPdfButton.addEventListener('click', () => {
+    if (generatedPdfBlobUrl) {
+        const link = document.createElement('a');
+        link.href = generatedPdfBlobUrl;
+        link.download = generatedPdfFileName; 
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        formFields.forEach(field => localStorage.removeItem(field.id));
+    } else {
+        alert("Error: No se ha generado ningún PDF.");
+    }
+});
+
+// --- FUNCIONES AUXILIARES ---
 
 function getImagesAsBase64() {
-    const ids = ['fotoDelantera', 'fotoTrasera', 'fotoDetalleDefecto', 'fotoEtiqueta'];
-    
-    const filePromises = ids.map(id => {
+    const fileInputs = [
+        document.getElementById('fotoDelantera'), document.getElementById('fotoTrasera'),
+        document.getElementById('fotoDetalleDefecto'), document.getElementById('fotoEtiqueta')
+    ];
+    const filePromises = fileInputs.map(input => {
         return new Promise((resolve, reject) => {
-            const input = document.getElementById(id);
-            if (!input) {
-                reject(new Error(`No se encuentra el input con ID: ${id}`));
-                return;
-            }
             if (input.files && input.files[0]) {
                 const reader = new FileReader();
                 reader.onload = (e) => resolve(e.target.result);
                 reader.onerror = reject;
                 reader.readAsDataURL(input.files[0]);
             } else {
-                reject(new Error(`Falta seleccionar la imagen del campo: ${id}`));
+                reject(new Error(`La imagen "${input.labels[0].textContent}" es obligatoria.`));
             }
         });
     });
     return Promise.all(filePromises).then(([delantera, trasera, detalle, etiqueta]) => ({ delantera, trasera, detalle, etiqueta }));
 }
 
+// ESTA ES LA FUNCIÓN QUE CAMBIA LA APARIENCIA DEL PDF
 async function generatePdfBlob(data, images, fileName) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
+    
     doc.setProperties({ title: fileName });
 
-    const pageWidth = doc.internal.pageSize.getWidth(); 
-    const margin = 12; 
-    const headerBgColor = [253, 248, 235]; 
-    const labelBgColor = [230, 230, 230];  
-    const redColor = [255, 0, 0];          
+    // Dimensiones y márgenes
+    const pageWidth = doc.internal.pageSize.getWidth(); // 210
+    const margin = 10;
+    const contentWidth = pageWidth - (margin * 2);
 
-    // --- CABECERA ---
-    doc.setFillColor(...headerBgColor);
-    doc.rect(0, 0, pageWidth, 35, 'F');
+    // Colores del diseño
+    const colorBeige = [253, 248, 235];
+    const colorRojo = [237, 28, 36]; // Rojo U-Power aproximado
+    const colorGrisEtiqueta = [240, 240, 240];
 
-    // Logo
+    // --- 1. CABECERA (Fondo Beige) ---
+    doc.setFillColor(...colorBeige);
+    doc.rect(0, 0, pageWidth, 35, 'F'); // Rectángulo fondo cabecera
+
+    // Logos y Título
     try {
-        const logoUrl = 'img/upower.png';
-        const response = await fetch(logoUrl);
-        if (response.ok) {
-            const logoBlob = await response.blob();
-            const logoBase64 = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.readAsDataURL(logoBlob);
-            });
-            doc.addImage(logoBase64, 'PNG', margin, 8, 30, 12);
-            doc.addImage(logoBase64, 'PNG', pageWidth - margin - 30, 8, 30, 12);
-        }
-    } catch (e) { console.warn("Logo no cargado", e); }
+        const upowerLogoBase64 = await imageToBase64('img/upower.png');
+        // Logo Izquierdo
+        doc.addImage(upowerLogoBase64, 'PNG', margin, 6, 28, 10);
+        // Logo Derecho
+        doc.addImage(upowerLogoBase64, 'PNG', pageWidth - margin - 28, 6, 28, 10);
+    } catch (logoError) {
+        console.warn('Logo de U-Power no encontrado, continuando sin logos.', logoError);
+    }
 
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.setTextColor(...redColor);
-    doc.text('RECLAMACION DE GARANTÍAS', pageWidth / 2, 18, { align: 'center' });
+    doc.setFontSize(16).setFont('Helvetica', 'bold').setTextColor(...colorRojo);
+    doc.text('RECLAMACION DE GARANTÍAS', pageWidth / 2, 14, { align: 'center' });
+
+    // Línea separadora negra fina
     doc.setDrawColor(0);
     doc.setLineWidth(0.5);
     doc.line(margin, 38, pageWidth - margin, 38);
 
-    // --- DATOS ---
+    // --- 2. CAMPOS DE DATOS (Estilo Tabla) ---
     let y = 45;
-    const colGap = 10;
-    const contentWidth = pageWidth - (margin * 2);
-    const colWidth = (contentWidth - colGap) / 2; 
     const rowHeight = 8;
-    const labelWidth = 25; 
-    const valueWidth = colWidth - labelWidth;
+    const gap = 5;
+    const halfWidth = (contentWidth - gap) / 2;
+    const labelWidth = 25;
+    const valWidth = halfWidth - labelWidth;
 
-    const drawRow = (label, value, xStart, yPos) => {
-        doc.setFillColor(...labelBgColor);
-        doc.rect(xStart, yPos, labelWidth, rowHeight, 'FD'); 
-        doc.setFont('Helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.setTextColor(0);
-        doc.text(label, xStart + 2, yPos + 5.5);
+    // Función para dibujar una "celda" estilo formulario (Gris | Blanco)
+    const drawFormRow = (lbl, val, x, currentY) => {
+        // Etiqueta (Gris con borde)
+        doc.setFillColor(...colorGrisEtiqueta);
+        doc.rect(x, currentY, labelWidth, rowHeight, 'FD');
+        doc.setFontSize(9).setFont('Helvetica', 'bold').setTextColor(0);
+        doc.text(lbl, x + 1, currentY + 5.5);
+
+        // Valor (Blanco con borde)
         doc.setFillColor(255, 255, 255);
-        doc.rect(xStart + labelWidth, yPos, valueWidth, rowHeight, 'FD');
-        doc.setFont('Helvetica', 'normal');
-        doc.text(String(value || '').toUpperCase(), xStart + labelWidth + 2, yPos + 5.5);
+        doc.rect(x + labelWidth, currentY, valWidth, rowHeight, 'FD');
+        doc.setFontSize(9).setFont('Helvetica', 'normal');
+        doc.text(String(val || '').toUpperCase(), x + labelWidth + 2, currentY + 5.5);
     };
 
-    const leftColX = margin;
-    const rightColX = margin + colWidth + colGap;
-
-    drawRow('FECHA', data.fecha, leftColX, y);
-    drawRow('AGENTE', 'Representaciones Arroyo', rightColX, y);
+    // Fila 1: FECHA y AGENTE
+    drawFormRow('FECHA', data.fecha, margin, y);
+    drawFormRow('AGENTE', 'Representaciones Arroyo', margin + halfWidth + gap, y);
     y += rowHeight + 2;
 
-    drawRow('CLIENTE', data.empresa, leftColX, y);
-    drawRow('CONTACTO', data.contacto, rightColX, y);
-    y += rowHeight + 8; 
+    // Fila 2: CLIENTE y CONTACTO
+    drawFormRow('CLIENTE', data.empresa, margin, y);
+    drawFormRow('CONTACTO', data.contacto, margin + halfWidth + gap, y);
+    y += rowHeight + 8; // Espacio extra antes de la siguiente sección
 
-    const startYSection2 = y;
-    drawRow('MODELO', data.modelo, leftColX, y);
+    // Fila 3: MODELO (Izq) y Descripción (Inicio Der)
+    const yStartDetails = y;
+    
+    // Columna Izquierda (Modelo, Ref, Talla)
+    drawFormRow('MODELO', data.modelo, margin, y);
     y += rowHeight + 2;
-    drawRow('REF', data.referencia, leftColX, y);
+    drawFormRow('REF', data.referencia, margin, y);
     y += rowHeight + 2;
-    drawRow('TALLA', data.talla, leftColX, y);
+    drawFormRow('TALLA', data.talla, margin, y);
 
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text('DESCRIPCIÓN DEFECTO', rightColX, startYSection2 - 1); 
-    const descBoxHeight = (rowHeight * 3) + 4; 
+    // Columna Derecha (Caja grande Descripción)
+    const xRight = margin + halfWidth + gap;
+    doc.setFontSize(9).setFont('Helvetica', 'bold').setTextColor(0);
+    doc.text('DESCRIPCIÓN DEFECTO', xRight, yStartDetails - 1); // Título encima de la caja
+    
+    const boxHeight = (rowHeight * 3) + 4; // Altura equivalente a las 3 filas izq
     doc.setDrawColor(0);
-    doc.setFillColor(255, 255, 255);
-    doc.rect(rightColX, startYSection2, colWidth, descBoxHeight, 'S'); 
+    doc.rect(xRight, yStartDetails, halfWidth, boxHeight); // Solo borde
+    
     doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(9);
-    const splitDesc = doc.splitTextToSize(data.defecto, colWidth - 4);
-    doc.text(splitDesc, rightColX + 2, startYSection2 + 5);
-    y = startYSection2 + descBoxHeight + 10; 
+    const splitDesc = doc.splitTextToSize(data.defecto || '', halfWidth - 4);
+    doc.text(splitDesc, xRight + 2, yStartDetails + 4);
 
-    // --- FOTOS ---
-    const photoBoxHeight = 160; 
-    const photoBoxY = y;
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.setFillColor(100, 100, 100); 
-    doc.text('INSERTAR FOTOGRAFÍAS', pageWidth / 2, photoBoxY - 3, { align: 'center' });
-    doc.setLineWidth(0.5);
-    doc.rect(margin, photoBoxY, contentWidth, photoBoxHeight, 'S');
+    y = yStartDetails + boxHeight + 10; // Actualizar Y para las fotos
 
-    const pPad = 5;
-    const gridW = (contentWidth - (pPad * 3)) / 2;
-    const gridH = (photoBoxHeight - (pPad * 3)) / 2;
-    const x1 = margin + pPad;
-    const x2 = margin + pPad + gridW + pPad;
-    const y1 = photoBoxY + pPad;
-    const y2 = photoBoxY + pPad + gridH + pPad;
+    // --- 3. FOTOGRAFÍAS (Cuadro grande) ---
+    const boxPhotoHeight = 150;
+    
+    // Título centrado
+    doc.setFontSize(12).setFont('Helvetica', 'bold').setTextColor(80, 80, 80);
+    doc.text('INSERTAR FOTOGRAFÍAS', pageWidth / 2, y - 2, { align: 'center' });
 
-    if (images.delantera) doc.addImage(images.delantera, 'JPEG', x1, y1, gridW, gridH, undefined, 'FAST');
-    if (images.etiqueta) doc.addImage(images.etiqueta, 'JPEG', x2, y1, gridW, gridH, undefined, 'FAST');
-    if (images.detalle) doc.addImage(images.detalle, 'JPEG', x1, y2, gridW, gridH, undefined, 'FAST');
-    if (images.trasera) doc.addImage(images.trasera, 'JPEG', x2, y2, gridW, gridH, undefined, 'FAST');
+    // Marco contenedor
+    doc.rect(margin, y, contentWidth, boxPhotoHeight);
+
+    // Grid 2x2
+    const padding = 5;
+    const photoW = (contentWidth - (padding * 3)) / 2;
+    const photoH = (boxPhotoHeight - (padding * 3)) / 2;
+
+    const xC1 = margin + padding;
+    const xC2 = margin + padding + photoW + padding;
+    const yR1 = y + padding;
+    const yR2 = y + padding + photoH + padding;
+
+    // Insertar imágenes
+    if (images.delantera) doc.addImage(images.delantera, 'JPEG', xC1, yR1, photoW, photoH);
+    if (images.etiqueta) doc.addImage(images.etiqueta, 'JPEG', xC2, yR1, photoW, photoH); // Etiqueta arriba derecha según diseño
+    
+    // Logo U-Power abajo izquierda (o foto detalle si prefieres, pero en tu imagen se ve un logo grande)
+    // Según tu diseño original había 4 fotos. Si quieres replicar la imagen adjunta donde sale el logo grande abajo izq:
+    try {
+        const logoBig = await imageToBase64('img/upower.png');
+        // Usamos una proporción aspecto más natural para el logo
+        doc.addImage(logoBig, 'PNG', xC1 + 10, yR2 + 20, photoW - 20, (photoW - 20) * 0.4); 
+    } catch(e) {
+         // Si no carga el logo, ponemos la foto detalle si existe
+         if (images.detalle) doc.addImage(images.detalle, 'JPEG', xC1, yR2, photoW, photoH);
+    }
+    
+    // Cuarta foto (Abajo derecha)
+    if (images.trasera) doc.addImage(images.trasera, 'JPEG', xC2, yR2, photoW, photoH);
+
 
     return doc.output('blob');
+}
+
+function imageToBase64(url) {
+    return new Promise((resolve, reject) => {
+        fetch(url)
+            .then(res => res.blob())
+            .then(blob => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            })
+            .catch(reject);
+    });
 }
