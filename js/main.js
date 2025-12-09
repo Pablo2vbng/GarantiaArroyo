@@ -6,8 +6,8 @@ const form = document.getElementById('reclamacionForm');
 const viewPdfButton = document.getElementById('viewPdfButton');
 
 let formFields;
-let generatedPdfBlobUrl = null; // Guardaremos la URL del PDF aquí
-let generatedPdfFileName = "Reclamacion.pdf"; // Variable para guardar el nombre personalizado
+let generatedPdfBlobUrl = null; 
+let generatedPdfFileName = "Reclamacion.pdf"; 
 
 document.addEventListener('DOMContentLoaded', () => {
     // Asignar formFields una vez que el DOM está listo
@@ -53,31 +53,22 @@ form.addEventListener('submit', async (event) => {
     const data = Object.fromEntries(formData.entries());
 
     // --- LÓGICA DE NOMBRE DEL ARCHIVO ---
-    // 1. Formatear la fecha (de YYYY-MM-DD a DD-MM-YY)
     let fechaStr = "00-00-00";
     if(data.fecha) {
-        const parts = data.fecha.split('-'); // [2025, 12, 09]
+        const parts = data.fecha.split('-'); 
         if(parts.length === 3) {
             fechaStr = `${parts[2]}-${parts[1]}-${parts[0].slice(-2)}`;
         }
     }
-
-    // 2. Limpiar nombre empresa (Quitar espacios y caracteres raros para el nombre del archivo)
-    // Ejemplo: "Alisan mascotas" -> "Alisanmascotas"
     const empresaLimpia = (data.empresa || '').replace(/[^a-zA-Z0-9]/g, '');
-
-    // 3. Obtener factura
     const facturaStr = (data.factura || '').replace(/[^a-zA-Z0-9]/g, '');
-
-    // 4. Construir el nombre final: Garantia-Empresa-Factura-Fecha.pdf
     generatedPdfFileName = `Garantia-${empresaLimpia}-${facturaStr}-${fechaStr}.pdf`;
     // -------------------------------------
 
     try {
         const images = await getImagesAsBase64();
-        // Pasamos el nombre del archivo a la función generadora para los metadatos
         const pdfBlob = await generatePdfBlob(data, images, generatedPdfFileName);
-        generatedPdfBlobUrl = URL.createObjectURL(pdfBlob); // Guardar la URL del blob
+        generatedPdfBlobUrl = URL.createObjectURL(pdfBlob); 
 
         // Configurar el enlace de correo
         const mailtoLink = document.getElementById('mailtoLink');
@@ -85,14 +76,12 @@ form.addEventListener('submit', async (event) => {
         const body = `Hola,\n\nHas recibido una nueva reclamación de la empresa: ${data.empresa}.\nPersona de contacto: ${data.contacto}.\n\nTodos los detalles y las imágenes están en el archivo PDF adjunto (${generatedPdfFileName}).\n\nSaludos.`;
         mailtoLink.href = `mailto:nacho@representacionesarroyo.es,paloma@representacionesarroyo.es?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
-        // Cambiar a la vista de "Confirmación"
         loadingContainer.style.display = 'none';
         confirmationContainer.style.display = 'block';
 
     } catch (error) {
         alert(error.message || 'Hubo un problema al generar el PDF.');
         console.error(error);
-        // Volver a la vista del formulario si hay un error
         loadingContainer.style.display = 'none';
         formContainer.style.display = 'block';
     }
@@ -101,26 +90,12 @@ form.addEventListener('submit', async (event) => {
 // Event listener para el botón "Ver y Guardar PDF"
 viewPdfButton.addEventListener('click', () => {
     if (generatedPdfBlobUrl) {
-        // Opción A: Intentar forzar la descarga con nombre correcto
-        // Esto funciona mejor para mantener el nombre del archivo
         const link = document.createElement('a');
         link.href = generatedPdfBlobUrl;
-        link.download = generatedPdfFileName; // Aquí se aplica el nombre personalizado
+        link.download = generatedPdfFileName; 
         document.body.appendChild(link);
-        
-        // En móviles a veces es necesario abrir en nueva pestaña si la descarga falla,
-        // pero 'download' es la única forma estándar de poner nombre.
         link.click();
-        
         document.body.removeChild(link);
-
-        // Fallback visual para móviles (opcional): Abrir también en pestaña nueva
-        // si el click anterior no fue suficiente (algunos navegadores iOS bloquean descargas directas sin visualización)
-        // setTimeout(() => {
-        //     window.open(generatedPdfBlobUrl, '_blank');
-        // }, 500);
-
-        // Limpiar localStorage DESPUÉS de que el usuario haya interactuado
         formFields.forEach(field => localStorage.removeItem(field.id));
     } else {
         alert("Error: No se ha generado ningún PDF.");
@@ -151,65 +126,162 @@ function getImagesAsBase64() {
 
 async function generatePdfBlob(data, images, fileName) {
     const { jsPDF } = window.jspdf;
+    // Configuración inicial
     const doc = new jsPDF('p', 'mm', 'a4');
-    
-    // AÑADIR METADATOS AL PDF (Título interno)
-    doc.setProperties({
-        title: fileName
-    });
+    doc.setProperties({ title: fileName });
 
-    const margin = 10;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const contentWidth = pageWidth - (margin * 2);
+    const pageWidth = doc.internal.pageSize.getWidth(); // 210mm
+    const pageHeight = doc.internal.pageSize.getHeight(); // 297mm
+    const margin = 12; // Margen lateral similar a la imagen
 
+    // Colores
+    const headerBgColor = [253, 248, 235]; // Crema/Beige claro para cabecera
+    const labelBgColor = [230, 230, 230];  // Gris claro para etiquetas
+    const redColor = [255, 0, 0];          // Rojo U-Power
+
+    // --- 1. CABECERA ---
+    // Fondo crema
+    doc.setFillColor(...headerBgColor);
+    doc.rect(0, 0, pageWidth, 35, 'F');
+
+    // Logos U-Power (Izquierda y Derecha)
     try {
-        const upowerLogoBase64 = await imageToBase64('img/upower.png');
-        doc.addImage(upowerLogoBase64, 'PNG', margin, 5, 25, 10);
-    } catch (logoError) {
-        console.warn('Logo de U-Power no encontrado:', logoError);
+        const logo = await imageToBase64('img/upower.png');
+        // Logo Izquierdo
+        doc.addImage(logo, 'PNG', margin, 8, 30, 12);
+        // Logo Derecho
+        doc.addImage(logo, 'PNG', pageWidth - margin - 30, 8, 30, 12);
+    } catch (e) {
+        console.warn("No se pudo cargar el logo:", e);
     }
 
-    doc.setFontSize(14).setFont('Helvetica', 'bold').setTextColor(255, 0, 0);
-    doc.text('RECLAMACION DE GARANTÍAS', pageWidth / 2, 10, { align: 'center' });
-    doc.setDrawColor(0, 0, 0).setLineWidth(0.5).line(margin, 15, pageWidth - margin, 15);
+    // Título Rojo Centrado
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(...redColor);
+    doc.text('RECLAMACION DE GARANTÍAS', pageWidth / 2, 18, { align: 'center' });
 
-    let y = 20;
-    const fieldHeight = 8, labelWidth = 30, dataWidth = 60;
-    const col1X = margin, col2X = margin + labelWidth + dataWidth + 10;
+    // Línea separadora debajo de la cabecera
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.5);
+    doc.line(margin, 38, pageWidth - margin, 38);
 
-    const drawField = (label, value, x, yPos) => {
-        doc.setFontSize(9).setFont('Helvetica', 'bold').setFillColor(230, 230, 230);
-        doc.rect(x, yPos, labelWidth, fieldHeight, 'FD');
-        doc.setTextColor(0, 0, 0).text(label, x + 2, yPos + 5);
-        doc.rect(x + labelWidth, yPos, dataWidth, fieldHeight, 'S');
-        doc.setFont('Helvetica', 'normal').text(value || '', x + labelWidth + 2, yPos + 5);
+
+    // --- 2. CAMPOS DE DATOS ---
+    // Configuración de la rejilla
+    let y = 45;
+    const colGap = 10;
+    const contentWidth = pageWidth - (margin * 2);
+    const colWidth = (contentWidth - colGap) / 2; // Ancho de cada "columna" visual
+    
+    // Dimensiones celdas
+    const rowHeight = 8;
+    const labelWidth = 25; // Ancho de la etiqueta "FECHA", "CLIENTE", etc.
+    const valueWidth = colWidth - labelWidth;
+
+    // Función auxiliar para dibujar una fila estilo tabla
+    const drawRow = (label, value, xStart, yPos) => {
+        // Recuadro Etiqueta (Fondo Gris)
+        doc.setFillColor(...labelBgColor);
+        doc.rect(xStart, yPos, labelWidth, rowHeight, 'FD'); // Fill + Draw border
+        
+        // Texto Etiqueta
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(0);
+        doc.text(label, xStart + 2, yPos + 5.5);
+
+        // Recuadro Valor (Fondo Blanco)
+        doc.setFillColor(255, 255, 255);
+        doc.rect(xStart + labelWidth, yPos, valueWidth, rowHeight, 'FD');
+
+        // Texto Valor
+        doc.setFont('Helvetica', 'normal');
+        doc.text(String(value || '').toUpperCase(), xStart + labelWidth + 2, yPos + 5.5);
     };
 
-    drawField('FECHA', data.fecha, col1X, y);
-    drawField('AGENTE', 'Representaciones Arroyo', col2X, y); y += fieldHeight;
-    drawField('CLIENTE', data.empresa, col1X, y);
-    drawField('CONTACTO', data.contacto, col2X, y); y += fieldHeight;
-    drawField('MODELO', data.modelo, col1X, y); y += fieldHeight;
-    drawField('REF', data.referencia, col1X, y); y += fieldHeight;
-    drawField('TALLA', data.talla, col1X, y); y += fieldHeight + 5;
+    // Coordenadas X
+    const leftColX = margin;
+    const rightColX = margin + colWidth + colGap;
 
-    doc.setFontSize(9).setFont('Helvetica', 'bold').text('DESCRIPCIÓN DEFECTO', col1X, y); y += 3;
-    const descHeight = 30;
-    doc.rect(col1X, y, contentWidth, descHeight, 'S');
-    const splitDescription = doc.splitTextToSize(data.defecto, contentWidth - 4);
-    doc.setFont('Helvetica', 'normal').text(splitDescription, col1X + 2, y + 5);
-    y += descHeight + 5;
+    // -- PRIMERA SECCIÓN (Arriba) --
+    // Fila 1: FECHA (Izq) | AGENTE (Der)
+    drawRow('FECHA', data.fecha, leftColX, y);
+    drawRow('AGENTE', 'Representaciones Arroyo', rightColX, y);
+    y += rowHeight + 2; // Espacio vertical pequeño
 
-    const photoAreaHeight = doc.internal.pageSize.getHeight() - y - margin;
-    doc.setFillColor(245, 245, 245).rect(margin, y, contentWidth, photoAreaHeight, 'F');
-    const photoMargin = 5;
-    const photoGridWidth = (contentWidth - photoMargin) / 2;
-    const photoGridHeight = (photoAreaHeight - photoMargin) / 2;
+    // Fila 2: CLIENTE (Izq) | CONTACTO (Der)
+    drawRow('CLIENTE', data.empresa, leftColX, y);
+    drawRow('CONTACTO', data.contacto, rightColX, y);
+    
+    y += rowHeight + 8; // Salto más grande para separar secciones
 
-    if (images.delantera) doc.addImage(images.delantera, 'JPEG', col1X, y, photoGridWidth, photoGridHeight);
-    if (images.trasera) doc.addImage(images.trasera, 'JPEG', col1X + photoGridWidth + photoMargin, y, photoGridWidth, photoGridHeight);
-    if (images.detalle) doc.addImage(images.detalle, 'JPEG', col1X, y + photoGridHeight + photoMargin, photoGridWidth, photoGridHeight);
-    if (images.etiqueta) doc.addImage(images.etiqueta, 'JPEG', col1X + photoGridWidth + photoMargin, y + photoGridHeight + photoMargin, photoGridWidth, photoGridHeight);
+    // -- SEGUNDA SECCIÓN --
+    // Izquierda: MODELO, REF, TALLA
+    // Derecha: DESCRIPCIÓN DEL DEFECTO (Caja grande)
+
+    const startYSection2 = y;
+    
+    // Columna Izquierda
+    drawRow('MODELO', data.modelo, leftColX, y);
+    y += rowHeight + 2;
+    drawRow('REF', data.referencia, leftColX, y);
+    y += rowHeight + 2;
+    drawRow('TALLA', data.talla, leftColX, y);
+
+    // Columna Derecha (Caja de descripción)
+    // Título
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('DESCRIPCIÓN DEFECTO', rightColX, startYSection2 - 1); // Un poco encima de la caja
+    
+    // Caja grande (blanca con borde negro)
+    const descBoxHeight = (rowHeight * 3) + 4; // Altura equivalente a las 3 filas de la izquierda
+    doc.setDrawColor(0);
+    doc.setFillColor(255, 255, 255);
+    doc.rect(rightColX, startYSection2, colWidth, descBoxHeight, 'S'); // 'S' para solo Stroke (borde)
+    
+    // Texto descripción con auto-ajuste
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(9);
+    const splitDesc = doc.splitTextToSize(data.defecto, colWidth - 4);
+    doc.text(splitDesc, rightColX + 2, startYSection2 + 5);
+
+    y = startYSection2 + descBoxHeight + 10; // Mover Y debajo de todo
+
+    // --- 3. SECCIÓN FOTOGRAFÍAS ---
+    
+    // Marco exterior grande
+    const photoBoxHeight = 160; // Altura fija grande para las fotos
+    const photoBoxY = y;
+    
+    // Título centrado en el borde superior del recuadro
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setFillColor(100, 100, 100); // Color gris oscuro para el texto
+    doc.text('INSERTAR FOTOGRAFÍAS', pageWidth / 2, photoBoxY - 3, { align: 'center' });
+
+    // El borde grande del contenedor
+    doc.setLineWidth(0.5);
+    doc.rect(margin, photoBoxY, contentWidth, photoBoxHeight, 'S');
+
+    // Cálculos para la cuadrícula de fotos (2x2)
+    // Dejamos un padding interno
+    const pPad = 5;
+    const gridW = (contentWidth - (pPad * 3)) / 2;
+    const gridH = (photoBoxHeight - (pPad * 3)) / 2;
+
+    // Coordenadas cuadrícula
+    const x1 = margin + pPad;
+    const x2 = margin + pPad + gridW + pPad;
+    const y1 = photoBoxY + pPad;
+    const y2 = photoBoxY + pPad + gridH + pPad;
+
+    // Insertar imágenes (ajustando a cover/contain básico)
+    if (images.delantera) doc.addImage(images.delantera, 'JPEG', x1, y1, gridW, gridH, undefined, 'FAST');
+    if (images.etiqueta) doc.addImage(images.etiqueta, 'JPEG', x2, y1, gridW, gridH, undefined, 'FAST');
+    if (images.detalle) doc.addImage(images.detalle, 'JPEG', x1, y2, gridW, gridH, undefined, 'FAST');
+    if (images.trasera) doc.addImage(images.trasera, 'JPEG', x2, y2, gridW, gridH, undefined, 'FAST');
 
     return doc.output('blob');
 }
@@ -224,6 +296,9 @@ function imageToBase64(url) {
                 reader.onerror = reject;
                 reader.readAsDataURL(blob);
             })
+            .catch(reject);
+    });
+}
             .catch(reject);
     });
 }
