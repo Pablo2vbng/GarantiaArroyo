@@ -150,15 +150,13 @@ async function generatePdfBlob(data, images, fileName) {
     doc.setFillColor(...colorBeige);
     doc.rect(0, 0, pageWidth, 35, 'F'); // Rectángulo fondo cabecera
 
-    // Logos y Título
+    // Logos y Título en Cabecera
     try {
         const upowerLogoBase64 = await imageToBase64('img/upower.png');
-        // Logo Izquierdo
         doc.addImage(upowerLogoBase64, 'PNG', margin, 6, 28, 10);
-        // Logo Derecho
         doc.addImage(upowerLogoBase64, 'PNG', pageWidth - margin - 28, 6, 28, 10);
     } catch (logoError) {
-        console.warn('Logo de U-Power no encontrado, continuando sin logos.', logoError);
+        console.warn('Logo de U-Power no encontrado en cabecera.');
     }
 
     doc.setFontSize(16).setFont('Helvetica', 'bold').setTextColor(...colorRojo);
@@ -177,67 +175,54 @@ async function generatePdfBlob(data, images, fileName) {
     const labelWidth = 25;
     const valWidth = halfWidth - labelWidth;
 
-    // Función para dibujar una "celda" estilo formulario (Gris | Blanco)
     const drawFormRow = (lbl, val, x, currentY) => {
-        // Etiqueta (Gris con borde)
         doc.setFillColor(...colorGrisEtiqueta);
         doc.rect(x, currentY, labelWidth, rowHeight, 'FD');
         doc.setFontSize(9).setFont('Helvetica', 'bold').setTextColor(0);
         doc.text(lbl, x + 1, currentY + 5.5);
 
-        // Valor (Blanco con borde)
         doc.setFillColor(255, 255, 255);
         doc.rect(x + labelWidth, currentY, valWidth, rowHeight, 'FD');
         doc.setFontSize(9).setFont('Helvetica', 'normal');
         doc.text(String(val || '').toUpperCase(), x + labelWidth + 2, currentY + 5.5);
     };
 
-    // Fila 1: FECHA y AGENTE
     drawFormRow('FECHA', data.fecha, margin, y);
     drawFormRow('AGENTE', 'Representaciones Arroyo', margin + halfWidth + gap, y);
     y += rowHeight + 2;
 
-    // Fila 2: CLIENTE y CONTACTO
     drawFormRow('CLIENTE', data.empresa, margin, y);
     drawFormRow('CONTACTO', data.contacto, margin + halfWidth + gap, y);
-    y += rowHeight + 8; // Espacio extra antes de la siguiente sección
+    y += rowHeight + 8;
 
-    // Fila 3: MODELO (Izq) y Descripción (Inicio Der)
     const yStartDetails = y;
-    
-    // Columna Izquierda (Modelo, Ref, Talla)
     drawFormRow('MODELO', data.modelo, margin, y);
     y += rowHeight + 2;
     drawFormRow('REF', data.referencia, margin, y);
     y += rowHeight + 2;
     drawFormRow('TALLA', data.talla, margin, y);
 
-    // Columna Derecha (Caja grande Descripción)
     const xRight = margin + halfWidth + gap;
     doc.setFontSize(9).setFont('Helvetica', 'bold').setTextColor(0);
-    doc.text('DESCRIPCIÓN DEFECTO', xRight, yStartDetails - 1); // Título encima de la caja
+    doc.text('DESCRIPCIÓN DEFECTO', xRight, yStartDetails - 1);
     
-    const boxHeight = (rowHeight * 3) + 4; // Altura equivalente a las 3 filas izq
+    const boxHeight = (rowHeight * 3) + 4;
     doc.setDrawColor(0);
-    doc.rect(xRight, yStartDetails, halfWidth, boxHeight); // Solo borde
+    doc.rect(xRight, yStartDetails, halfWidth, boxHeight);
     
     doc.setFont('Helvetica', 'normal');
     const splitDesc = doc.splitTextToSize(data.defecto || '', halfWidth - 4);
     doc.text(splitDesc, xRight + 2, yStartDetails + 4);
 
-    y = yStartDetails + boxHeight + 10; // Actualizar Y para las fotos
+    y = yStartDetails + boxHeight + 10;
 
     // --- 3. FOTOGRAFÍAS (Cuadro grande) ---
     const boxPhotoHeight = 150;
-    
-    // Título centrado
     doc.setFontSize(12).setFont('Helvetica', 'bold').setTextColor(80, 80, 80);
-    doc.text('FOTOGRAFÍAS DEL PRODUCTO', pageWidth / 2, y - 2, { align: 'center' });
+    doc.text('INSERTAR FOTOGRAFÍAS', pageWidth / 2, y - 2, { align: 'center' });
 
-    // Marco contenedor
     doc.rect(margin, y, contentWidth, boxPhotoHeight);
 
-    // Grid 2x2
     const padding = 5;
     const photoW = (contentWidth - (padding * 3)) / 2;
     const photoH = (boxPhotoHeight - (padding * 3)) / 2;
@@ -247,19 +232,18 @@ async function generatePdfBlob(data, images, fileName) {
     const yR1 = y + padding;
     const yR2 = y + padding + photoH + padding;
 
-    // Insertar imágenes del usuario en los 4 cuadrantes
-    // Arriba Izquierda: Foto Delantera
+    // INSERTAR IMÁGENES DEL USUARIO (Eliminada la carga del logo en esta sección)
+    // 1. Arriba Izquierda: Foto Delantera
     if (images.delantera) doc.addImage(images.delantera, 'JPEG', xC1, yR1, photoW, photoH);
     
-    // Arriba Derecha: Foto Etiqueta
-    if (images.etiqueta) doc.addImage(images.etiqueta, 'JPEG', xC2, yR1, photoW, photoH); 
+    // 2. Arriba Derecha: Foto Etiqueta
+    if (images.etiqueta) doc.addImage(images.etiqueta, 'JPEG', xC2, yR1, photoW, photoH);
     
-    // Abajo Izquierda: Foto Detalle Defecto (Corregido: Ya no carga el logo aquí)
+    // 3. Abajo Izquierda: Foto Detalle Defecto (CORREGIDO)
     if (images.detalle) doc.addImage(images.detalle, 'JPEG', xC1, yR2, photoW, photoH);
     
-    // Abajo Derecha: Foto Trasera
+    // 4. Abajo Derecha: Foto Trasera
     if (images.trasera) doc.addImage(images.trasera, 'JPEG', xC2, yR2, photoW, photoH);
-
 
     return doc.output('blob');
 }
