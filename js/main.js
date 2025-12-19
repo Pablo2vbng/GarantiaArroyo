@@ -232,7 +232,7 @@ async function generatePdfBlob(data, images, fileName) {
     
     // Título centrado
     doc.setFontSize(12).setFont('Helvetica', 'bold').setTextColor(80, 80, 80);
-    doc.text('INSERTAR FOTOGRAFÍAS', pageWidth / 2, y - 2, { align: 'center' });
+    doc.text('FOTOGRAFÍAS DEL PRODUCTO', pageWidth / 2, y - 2, { align: 'center' });
 
     // Marco contenedor
     doc.rect(margin, y, contentWidth, boxPhotoHeight);
@@ -247,22 +247,17 @@ async function generatePdfBlob(data, images, fileName) {
     const yR1 = y + padding;
     const yR2 = y + padding + photoH + padding;
 
-    // Insertar imágenes
+    // Insertar imágenes del usuario en los 4 cuadrantes
+    // Arriba Izquierda: Foto Delantera
     if (images.delantera) doc.addImage(images.delantera, 'JPEG', xC1, yR1, photoW, photoH);
-    if (images.etiqueta) doc.addImage(images.etiqueta, 'JPEG', xC2, yR1, photoW, photoH); // Etiqueta arriba derecha según diseño
     
-    // Logo U-Power abajo izquierda (o foto detalle si prefieres, pero en tu imagen se ve un logo grande)
-    // Según tu diseño original había 4 fotos. Si quieres replicar la imagen adjunta donde sale el logo grande abajo izq:
-    try {
-        const logoBig = await imageToBase64('img/upower.png');
-        // Usamos una proporción aspecto más natural para el logo
-        doc.addImage(logoBig, 'PNG', xC1 + 10, yR2 + 20, photoW - 20, (photoW - 20) * 0.4); 
-    } catch(e) {
-         // Si no carga el logo, ponemos la foto detalle si existe
-         if (images.detalle) doc.addImage(images.detalle, 'JPEG', xC1, yR2, photoW, photoH);
-    }
+    // Arriba Derecha: Foto Etiqueta
+    if (images.etiqueta) doc.addImage(images.etiqueta, 'JPEG', xC2, yR1, photoW, photoH); 
     
-    // Cuarta foto (Abajo derecha)
+    // Abajo Izquierda: Foto Detalle Defecto (Corregido: Ya no carga el logo aquí)
+    if (images.detalle) doc.addImage(images.detalle, 'JPEG', xC1, yR2, photoW, photoH);
+    
+    // Abajo Derecha: Foto Trasera
     if (images.trasera) doc.addImage(images.trasera, 'JPEG', xC2, yR2, photoW, photoH);
 
 
